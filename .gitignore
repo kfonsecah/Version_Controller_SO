@@ -1,6 +1,7 @@
 # Ignorar archivos de compilación y binarios de PyInstaller
 build/
 dist/
+data/
 *.spec
 
 # Ignorar archivos temporales y de caché de Python
