@@ -1,0 +1,17 @@
+{
+    "kendall": {
+        "permisos": {
+            "alejandro": "lectura"
+        },
+        "repositorio": "C:\\Users\\Administrador\\Desktop\\U\\Sistemas\\kendall",
+        "admin": true
+    },
+    "matiw": {
+        "permisos": {},
+        "repositorio": null
+    },
+    "alejandro": {
+        "permisos": {},
+        "repositorio": null
+    }
+}
