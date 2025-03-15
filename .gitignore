@@ -1,0 +1,30 @@
+# Ignorar archivos de compilación y binarios de PyInstaller
+build/
+dist/
+*.spec
+
+# Ignorar archivos temporales y de caché de Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Ignorar archivos de entorno virtual de Python
+venv/
+.env/
+.venv/
+env/
+
+# Ignorar archivos de configuración de IDEs
+.vscode/
+.idea/
+*.iml
+
+# Ignorar logs y archivos de depuración
+*.log
+*.tmp
+*.swp
+.DS_Store
+
+# Ignorar base de datos JSON si es temporal (opcional)
+data/usuarios.json
