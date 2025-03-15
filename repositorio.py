@@ -22,16 +22,26 @@ def crear_repositorio(usuario, ruta):
         usuarios[usuario]["admin"] = True
         guardar_usuarios(usuarios)
 
-    # Crear la estructura de carpetas en la ruta elegida
-    if not os.path.exists(ruta):
-        os.makedirs(ruta)
+    # ✅ SOLUCIÓN: Limpiar y validar la ruta correctamente
+    ruta = os.path.normpath(ruta.strip().replace('"', ''))  # Elimina comillas y normaliza la ruta
+    ruta = os.path.abspath(ruta)  # Convierte a ruta absoluta
 
-    repo_path = os.path.join(ruta, usuario)
+    # ✅ Verificar que la carpeta base existe antes de crear subdirectorios
+    if not os.path.exists(os.path.dirname(ruta)):
+        print(f"❌ Error: La carpeta base '{os.path.dirname(ruta)}' no existe.")
+        return False
+
+    repo_path = ruta if ruta.endswith(usuario) else os.path.join(ruta, usuario)
     temp_path = os.path.join(repo_path, "temporal")
     perm_path = os.path.join(repo_path, "permanente")
 
-    os.makedirs(temp_path, exist_ok=True)
-    os.makedirs(perm_path, exist_ok=True)
+    try:
+        os.makedirs(repo_path, exist_ok=True)
+        os.makedirs(temp_path, exist_ok=True)
+        os.makedirs(perm_path, exist_ok=True)
+    except OSError as e:
+        print(f"❌ Error al crear la estructura del repositorio: {e}")
+        return False
 
     usuarios[usuario]["repositorio"] = repo_path
     guardar_usuarios(usuarios)

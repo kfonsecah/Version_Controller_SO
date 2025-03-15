@@ -18,25 +18,25 @@ HELP_TEXT = """
 ══════════════════════════════════════════════════════
  📌 COMANDOS DISPONIBLES:
  ------------------------------------------------------
- 🔹 crear_repositorio --usuario <nombre> --ruta <ruta>
+ 🔹 repo --user <nombre> --path <ruta>
      ➝ Crea un repositorio en una ubicación específica.
 
- 🔹 crear_usuario --admin <nombre> --usuario <nuevo>
+ 🔹 user --admin <nombre> --new <nuevo>
      ➝ Crea un usuario (solo administradores pueden hacerlo).
 
- 🔹 listar --usuario <nombre>
+ 🔹 ls --user <nombre>
      ➝ Lista los archivos en el repositorio del usuario.
 
- 🔹 commit --usuario <nombre>
+ 🔹 commit --user <nombre>
      ➝ Guarda cambios de la carpeta temporal a la permanente.
 
- 🔹 update --usuario <nombre>
+ 🔹 update --user <nombre>
      ➝ Restaura archivos de la permanente a la temporal.
 
- 🔹 asignar_permiso --usuario <nombre> --permiso <usuario:lectura/escritura>
+ 🔹 perm --user <nombre> --set <usuario:read/write>
      ➝ Asigna permisos a otro usuario.
 
- 🔹 salir
+ 🔹 exit
      ➝ Cierra el sistema.
 ══════════════════════════════════════════════════════
 """
@@ -92,7 +92,7 @@ def main():
         if not accion:
             continue
 
-        if accion in ["salir", "exit"]:
+        if accion in ["exit", "salir"]:
             print("\nSaliendo del sistema... 👋")
             time.sleep(1)
             sys.exit()
@@ -100,30 +100,30 @@ def main():
         elif accion in ["help", "--help"]:
             mostrar_help()
 
-        elif accion == "crear_repositorio" and "usuario" in args and "ruta" in args:
-            crear_repositorio(args["usuario"], args["ruta"])
+        elif accion in ["repo"] and "user" in args and "path" in args:
+            crear_repositorio(args["user"], args["path"])
 
-        elif accion == "crear_usuario" and "admin" in args and "usuario" in args:
-            crear_usuario_administrador(args["admin"], args["usuario"])
+        elif accion in ["user"] and "admin" in args and "new" in args:
+            crear_usuario_administrador(args["admin"], args["new"])
 
-        elif accion == "listar" and "usuario" in args:
-            listar_archivos(args["usuario"])
+        elif accion in ["ls"] and "user" in args:
+            listar_archivos(args["user"])
 
-        elif accion == "commit" and "usuario" in args:
-            commit(args["usuario"])
+        elif accion in ["commit"] and "user" in args:
+            commit(args["user"])
 
-        elif accion == "update" and "usuario" in args:
-            update(args["usuario"])
+        elif accion in ["update"] and "user" in args:
+            update(args["user"])
 
-        elif accion == "asignar_permiso" and "usuario" in args and "permiso" in args:
+        elif accion in ["perm"] and "user" in args and "set" in args:
             try:
-                objetivo, permiso = args["permiso"].split(":")
-                asignar_permiso(args["usuario"], objetivo, permiso)
+                objetivo, permiso = args["set"].split(":")
+                asignar_permiso(args["user"], objetivo, permiso)
             except ValueError:
-                print("❌ Error en el formato del permiso. Usa: --permiso usuario:lectura o usuario:escritura")
+                print("❌ Formato incorrecto. Usa '--set usuario:read' o '--set usuario:write'")
 
-    else:
-        print("❌ Comando no reconocido. Escribe 'help' para ver la lista de comandos.")
+        else:
+            print("❌ Comando no reconocido. Escribe 'help' para ver la lista de comandos.")
 
 if __name__ == "__main__":
     main()
