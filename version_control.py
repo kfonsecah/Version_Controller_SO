@@ -26,7 +26,10 @@ def commit(usuario):
 
     # Mover archivos de temporal a permanente
     for archivo in os.listdir(temp_path):
-        shutil.move(os.path.join(temp_path, archivo), perm_path)
+        shutil.copy(os.path.join(temp_path, archivo), os.path.join(perm_path, archivo))
+        dst = os.path.join(perm_path, archivo)
+        shutil.copy(src, dst)
+
 
     print("✅ Commit realizado. Backup guardado en:", backup_dir)
 

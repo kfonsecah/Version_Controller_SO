@@ -235,8 +235,8 @@ class GitGUI(tk.Tk):
         backup_dir = os.path.join(repo, "versions")
         if not os.path.exists(backup_dir):
             return messagebox.showinfo("Backups", "No hay versiones disponibles.")
-        
-        backups = os.listdir(backup_dir)
+
+        backups = [d for d in os.listdir(backup_dir) if d.startswith("backup_") and os.path.isdir(os.path.join(backup_dir, d))]
         if not backups:
             return messagebox.showinfo("Backups", "No hay versiones guardadas.")
 
@@ -244,14 +244,42 @@ class GitGUI(tk.Tk):
         win.title("Backups disponibles")
         lista = tk.Listbox(win, width=60)
         lista.pack(padx=10, pady=10)
-        for b in backups:
+        for b in sorted(backups, reverse=True):
             lista.insert(tk.END, b)
+
+        def restaurar_backup(event):
+            seleccion = lista.curselection()
+            if not seleccion:
+                return
+            backup_nombre = lista.get(seleccion[0])
+            backup_path = os.path.join(backup_dir, backup_nombre)
+            perm_path = os.path.join(repo, "permanente")
+
+            respuesta = messagebox.askyesno("Restaurar", f"¿Restaurar el backup '{backup_nombre}'?")
+            if not respuesta:
+                return
+
+            # Borrar archivos actuales en permanente
+            for archivo in os.listdir(perm_path):
+                archivo_path = os.path.join(perm_path, archivo)
+                if os.path.isfile(archivo_path):
+                    os.remove(archivo_path)
+
+            # Copiar desde backup a permanente
+            for archivo in os.listdir(backup_path):
+                src = os.path.join(backup_path, archivo)
+                dst = os.path.join(perm_path, archivo)
+                if os.path.isfile(src):
+                    with open(src, "rb") as fsrc, open(dst, "wb") as fdst:
+                        fdst.write(fsrc.read())
+
+            messagebox.showinfo("Restaurado", f"Backup '{backup_nombre}' restaurado con éxito.")
+            self._mostrar_archivos()
+
+        lista.bind("<Double-Button-1>", restaurar_backup)
+
+        ttk.Button(win, text="Cerrar", command=win.destroy).pack(pady=10)
         
-        ttk.Button(win, text="Cerrar", command=win.destroy).pack(pady=5)
-        
-
-
-
 if __name__ == "__main__":
     app = GitGUI()
     app.mainloop()
