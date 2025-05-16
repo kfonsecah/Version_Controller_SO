@@ -101,10 +101,11 @@ class GitGUI(tk.Tk):
         ttk.Label(frame_archivos, text="📂 Temporal").grid(row=0, column=0)
         ttk.Label(frame_archivos, text="📂 Permanente").grid(row=0, column=1)
 
-        self.tree_temp = ttk.Treeview(frame_archivos, columns=("nombre"), show="headings")
-        self.tree_perm = ttk.Treeview(frame_archivos, columns=("nombre"), show="headings")
-        self.tree_temp.heading("nombre", text="Archivo")
-        self.tree_perm.heading("nombre", text="Archivo")
+        self.tree_temp = ttk.Treeview(frame_archivos)
+        self.tree_perm = ttk.Treeview(frame_archivos)
+
+        self.tree_temp.heading("#0", text="📂 Temporal")
+        self.tree_perm.heading("#0", text="📂 Permanente")
 
         self.tree_temp.grid(row=1, column=0, sticky="nsew", padx=5)
         self.tree_perm.grid(row=1, column=1, sticky="nsew", padx=5)
@@ -189,10 +190,20 @@ class GitGUI(tk.Tk):
         self.tree_temp.delete(*self.tree_temp.get_children())
         self.tree_perm.delete(*self.tree_perm.get_children())
 
-        for tree, path in [(self.tree_temp, temp), (self.tree_perm, perm)]:
-            if os.path.exists(path):
-                for nombre in os.listdir(path):
-                    tree.insert('', tk.END, values=(nombre,))
+        def agregar_elementos(tree, path, padre=""):
+            for nombre in os.listdir(path):
+                ruta = os.path.join(path, nombre)
+                if os.path.isdir(ruta):
+                    nodo = tree.insert(padre, "end", text=f"📁 {nombre}", open=False)
+                    agregar_elementos(tree, ruta, nodo)
+                else:
+                    tree.insert(padre, "end", text=f"📄 {nombre}")
+
+        if os.path.exists(temp):
+            agregar_elementos(self.tree_temp, temp)
+
+        if os.path.exists(perm):
+            agregar_elementos(self.tree_perm, perm)
 
     def _commit(self):
         user = self.usuario_actual.get()
