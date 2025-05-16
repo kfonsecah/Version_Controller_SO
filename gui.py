@@ -41,6 +41,10 @@ class GitGUI(tk.Tk):
         ttk.Label(self.sidebar, text="📁 Repositorios").pack(pady=(20, 0))
         self.list_repos = tk.Listbox(self.sidebar, height=10)
         self.list_repos.pack(padx=10, pady=5, fill='both', expand=True)
+        scroll_x = tk.Scrollbar(self.sidebar, orient='horizontal', command=self.list_repos.xview)
+        self.list_repos.config(xscrollcommand=scroll_x.set)
+        scroll_x.pack(fill='x', padx=10)
+
         self.list_repos.bind("<<ListboxSelect>>", self._on_repo_selected)
 
         ttk.Button(self.sidebar, text="➕ Crear nuevo repo", command=self._crear_nuevo_repositorio).pack(pady=(10, 5), padx=10, fill='x')
