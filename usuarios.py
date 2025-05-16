@@ -45,30 +45,37 @@ def crear_usuario_administrador(admin, nuevo_usuario):
     print(f"✅ Usuario '{nuevo_usuario}' creado por '{admin}'.")
     return True
 
-def asignar_permiso(usuario, objetivo, permiso):
+def asignar_permiso(propietario, visitante, permiso):
     usuarios = cargar_usuarios()
-    if usuario not in usuarios or objetivo not in usuarios:
-        print("❌ Usuario no válido.")
+
+    if propietario not in usuarios or visitante not in usuarios:
+        print("❌ El usuario no existe.")
         return False
+
     if permiso not in ["lectura", "escritura"]:
-        print("❌ Permiso no válido. Usa 'lectura' o 'escritura'")
+        print("❌ Permiso inválido. Usa 'lectura' o 'escritura'.")
         return False
-    usuarios[usuario]["permisos"][objetivo] = permiso
+
+    if not usuarios[propietario].get("repositorio"):
+        print("❌ Solo el propietario de un repositorio puede asignar permisos.")
+        return False
+
+    usuarios[propietario].setdefault("permisos", {})[visitante] = permiso
     guardar_usuarios(usuarios)
-    print(f"✅ '{usuario}' ahora tiene permiso '{permiso}' sobre '{objetivo}'.")
+    print(f"✅ '{propietario}' otorgó '{permiso}' a '{visitante}'.")
     return True
 
+
+
 def tiene_permiso(usuario_actual, propietario, tipo):
-    """
-    Verifica si el usuario_actual tiene permiso 'lectura' o 'escritura' sobre el repositorio del propietario.
-    """
     usuarios = cargar_usuarios()
     if usuario_actual == propietario:
-        return True  # siempre tiene acceso total a su propio repo
-    permisos = usuarios.get(usuario_actual, {}).get("permisos", {})
-    nivel = permisos.get(propietario)
+        return True
+    permisos = usuarios.get(propietario, {}).get("permisos", {})
+    nivel = permisos.get(usuario_actual)
     if tipo == "lectura":
         return nivel in ["lectura", "escritura"]
     if tipo == "escritura":
         return nivel == "escritura"
     return False
+

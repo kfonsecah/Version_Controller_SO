@@ -1,18 +1,13 @@
 {
-    "": {
-        "permisos": {},
-        "repositorio": "C:\\Users\\Kendall Fonseca\\Desktop\\RepoTest",
-        "admin": true
-    },
     "Kendall": {
-        "repositorio": "C:\\Users\\Kendall Fonseca\\Desktop\\RepoTest\\Kendall",
-        "admin": true,
+        "repositorio": "C:\\Users\\Kendall Fonseca\\Desktop\\test\\Kendall",
+        "admin": false,
         "permisos": {
             "Alejandro": "escritura"
         }
     },
     "Alejandro": {
-        "repositorio": "C:\\Users\\Kendall Fonseca\\Desktop\\nuevo repo\\Alejandro",
+        "repositorio": null,
         "admin": false,
         "permisos": {}
     }

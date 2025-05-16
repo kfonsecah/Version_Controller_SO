@@ -17,9 +17,14 @@ def commit(usuario):
     backup_dir = os.path.join(perm_path, f"backup_{timestamp}")
     os.makedirs(backup_dir)
 
+    # Copiar archivos de permanente al backup
     for archivo in os.listdir(perm_path):
-        shutil.move(os.path.join(perm_path, archivo), backup_dir)
+        src = os.path.join(perm_path, archivo)
+        dst = os.path.join(backup_dir, archivo)
+        if os.path.isfile(src):
+            shutil.copy(src, dst)
 
+    # Mover archivos de temporal a permanente
     for archivo in os.listdir(temp_path):
         shutil.move(os.path.join(temp_path, archivo), perm_path)
 

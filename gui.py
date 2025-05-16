@@ -17,6 +17,22 @@ class GitGUI(tk.Tk):
 
         self._build_layout()
 
+    def _build_permisos_tab(self):
+        frame = ttk.LabelFrame(self.sidebar, text="🔑 Asignar permisos")
+        frame.pack(fill='x', padx=10, pady=10)
+
+        ttk.Label(frame, text="Usuario destino:").pack(anchor='w')
+        self.perm_user = ttk.Combobox(frame, state="readonly")
+        self.perm_user['values'] = list(self.usuarios.keys())
+        self.perm_user.pack(fill='x', pady=2)
+
+        ttk.Label(frame, text="Tipo de permiso:").pack(anchor='w')
+        self.perm_tipo = ttk.Combobox(frame, state="readonly")
+        self.perm_tipo['values'] = ["lectura", "escritura"]
+        self.perm_tipo.pack(fill='x', pady=2)
+
+        ttk.Button(frame, text="Asignar permiso", command=self._asignar_permiso_app).pack(fill='x', pady=5)
+
     def _build_layout(self):
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(1, weight=1)
@@ -30,6 +46,21 @@ class GitGUI(tk.Tk):
 
         self._build_sidebar()
         self._build_main_content()
+        self._build_permisos_tab()
+
+    def _asignar_permiso_app(self):
+        desde = self.usuario_actual.get()
+        hacia = self.perm_user.get()
+        tipo = self.perm_tipo.get()
+
+        if not (desde and hacia and tipo):
+            return messagebox.showerror("Error", "Todos los campos son obligatorios.")
+
+        if desde == hacia:
+            return messagebox.showerror("Error", "No puedes asignarte permisos a ti mismo.")
+
+        asignar_permiso(desde, hacia, tipo)
+        messagebox.showinfo("Permiso asignado", f"{desde} dio permiso '{tipo}' a {hacia}.")
 
     def _build_sidebar(self):
         ttk.Label(self.sidebar, text="👤 Usuario activo").pack(pady=(10, 0))
@@ -90,9 +121,21 @@ class GitGUI(tk.Tk):
     def _recargar_repos(self, usuario):
         self.list_repos.delete(0, tk.END)
         self.usuarios = cargar_usuarios()
+
+        # Repositorio propio
         repo_path = self.usuarios.get(usuario, {}).get("repositorio")
         if repo_path:
             self.list_repos.insert(tk.END, repo_path)
+
+        # Repos donde OTROS le dieron permiso a este usuario
+        for otro_user, data in self.usuarios.items():
+            if otro_user == usuario:
+                continue
+            permisos = data.get("permisos", {})
+            if usuario in permisos:
+                repo_otro = data.get("repositorio")
+                if repo_otro:
+                    self.list_repos.insert(tk.END, repo_otro)
 
     def _on_repo_selected(self, event=None):
         seleccion = self.list_repos.curselection()
@@ -127,6 +170,7 @@ class GitGUI(tk.Tk):
         crear_usuario(nuevo)
         self.usuarios = cargar_usuarios()
         self.combo_usuario['values'] = list(self.usuarios.keys())
+        self.perm_user['values'] = list(self.usuarios.keys())
         messagebox.showinfo("Éxito", f"Usuario '{nuevo}' creado.")
 
     def _get_paths(self):
