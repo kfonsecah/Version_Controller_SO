@@ -198,27 +198,6 @@ class GitGUI(tk.Tk):
         user = self.usuario_actual.get()
         if not user:
             return
-        repo = self.repo_actual.get()
-        if not repo:
-            return
-
-        # Guardar backup
-        perm_path = os.path.join(repo, "permanente")
-        backup_root = os.path.join(repo, "versions")
-        os.makedirs(backup_root, exist_ok=True)
-
-        timestamp = time.strftime("%Y%m%d_%H%M%S")
-        backup_path = os.path.join(backup_root, f"backup_{timestamp}")
-        os.makedirs(backup_path)
-
-        for archivo in os.listdir(perm_path):
-            src = os.path.join(perm_path, archivo)
-            dst = os.path.join(backup_path, archivo)
-            if os.path.isfile(src):
-                with open(src, "rb") as fsrc, open(dst, "wb") as fdst:
-                    fdst.write(fsrc.read())
-
-        # Hacer commit real
         commit(user)
         self._mostrar_archivos()
         messagebox.showinfo("Commit", "Commit completado y versión guardada.")
@@ -262,6 +241,8 @@ class GitGUI(tk.Tk):
         ttk.Button(win, text="Cerrar", command=win.destroy).pack(pady=5)
 
     def _mostrar_archivos_backup(self, backup_path):
+        import shutil
+
         ventana = tk.Toplevel(self)
         ventana.title(f"Archivos en {os.path.basename(backup_path)}")
 
@@ -274,25 +255,46 @@ class GitGUI(tk.Tk):
         def restaurar_archivo():
             seleccion = lista.curselection()
             if not seleccion:
-                return messagebox.showwarning("Sin selección", "Seleccione un archivo.")
-            archivo = lista.get(seleccion[0])
-            src = os.path.join(backup_path, archivo)
-            dst = os.path.join(self.repo_actual.get(), "permanente", archivo)
-            with open(src, "rb") as fsrc, open(dst, "wb") as fdst:
-                fdst.write(fsrc.read())
-            messagebox.showinfo("Restaurado", f"Archivo '{archivo}' restaurado.")
-            self._mostrar_archivos()
+                return messagebox.showwarning("Sin selección", "Seleccione un archivo o carpeta.")
+            nombre = lista.get(seleccion[0])
+            src = os.path.join(backup_path, nombre)
+            dst = os.path.join(self.repo_actual.get(), "permanente", nombre)
+
+            if os.path.exists(dst):
+                respuesta = messagebox.askyesno("Sobrescribir", f"Ya existe '{nombre}'. ¿Desea reemplazarlo?")
+                if not respuesta:
+                    return
+                if os.path.isdir(dst):
+                    shutil.rmtree(dst)
+                else:
+                    os.remove(dst)
+
+            try:
+                if os.path.isdir(src):
+                    shutil.copytree(src, dst)
+                else:
+                    shutil.copy2(src, dst)
+                messagebox.showinfo("Restaurado", f"'{nombre}' restaurado correctamente.")
+                self._mostrar_archivos()
+            except Exception as e:
+                messagebox.showerror("Error", f"No se pudo restaurar: {e}")
 
         def restaurar_todo():
             respuesta = messagebox.askyesno("Confirmar", "¿Deseas restaurar todos los archivos del backup?")
             if not respuesta:
                 return
             perm_path = os.path.join(self.repo_actual.get(), "permanente")
-            for archivo in os.listdir(backup_path):
-                src = os.path.join(backup_path, archivo)
-                dst = os.path.join(perm_path, archivo)
-                with open(src, "rb") as fsrc, open(dst, "wb") as fdst:
-                    fdst.write(fsrc.read())
+            for nombre in os.listdir(backup_path):
+                src = os.path.join(backup_path, nombre)
+                dst = os.path.join(perm_path, nombre)
+                try:
+                    if os.path.isdir(src):
+                        shutil.copytree(src, dst)
+                    else:
+                        shutil.copy2(src, dst)
+                except Exception as e:
+                    messagebox.showerror("Error", f"No se pudo restaurar: {e}")
+                    return
             messagebox.showinfo("Restaurado", "Todos los archivos fueron restaurados.")
             self._mostrar_archivos()
 
