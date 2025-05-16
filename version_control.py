@@ -5,7 +5,12 @@ from usuarios import cargar_usuarios, tiene_permiso
 
 def commit(usuario):
     usuarios = cargar_usuarios()
-    repo_path = usuarios[usuario]["repositorio"]
+    repo_path = usuarios[usuario].get("repositorio")
+
+    if not repo_path:
+        print("❌ El usuario no tiene un repositorio asignado.")
+        return
+
     temp_path = os.path.join(repo_path, "temporal")
     perm_path = os.path.join(repo_path, "permanente")
 
@@ -14,7 +19,10 @@ def commit(usuario):
         return
 
     timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-    backup_dir = os.path.join(perm_path, f"backup_{timestamp}")
+    # Cambia la ruta del backup para que esté en la carpeta 'versions' y no en 'permanente'
+    versions_dir = os.path.join(repo_path, "versions")
+    os.makedirs(versions_dir, exist_ok=True)
+    backup_dir = os.path.join(versions_dir, f"backup_{timestamp}")
     os.makedirs(backup_dir)
 
     # Copiar archivos de permanente al backup
@@ -22,14 +30,18 @@ def commit(usuario):
         src = os.path.join(perm_path, archivo)
         dst = os.path.join(backup_dir, archivo)
         if os.path.isfile(src):
-            shutil.copy(src, dst)
+            shutil.copy2(src, dst)
+        elif os.path.isdir(src):
+            shutil.copytree(src, dst, dirs_exist_ok=True)
 
     # Mover archivos de temporal a permanente
     for archivo in os.listdir(temp_path):
-        shutil.copy(os.path.join(temp_path, archivo), os.path.join(perm_path, archivo))
+        src = os.path.join(temp_path, archivo)
         dst = os.path.join(perm_path, archivo)
-        shutil.copy(src, dst)
-
+        if os.path.isfile(src):
+            shutil.copy2(src, dst)
+        elif os.path.isdir(src):
+            shutil.copytree(src, dst, dirs_exist_ok=True)
 
     print("✅ Commit realizado. Backup guardado en:", backup_dir)
 
@@ -50,7 +62,10 @@ def update(usuario_actual, propietario):
 
     for archivo in os.listdir(perm_path):
         ruta = os.path.join(perm_path, archivo)
+        destino_final = os.path.join(destino, archivo)
         if os.path.isfile(ruta):
-            shutil.copy(ruta, destino)
+            shutil.copy2(ruta, destino_final)
+        elif os.path.isdir(ruta):
+            shutil.copytree(ruta, destino_final, dirs_exist_ok=True)
 
     print(f"✅ Update realizado desde '{propietario}' hacia '{usuario_actual}'.")
