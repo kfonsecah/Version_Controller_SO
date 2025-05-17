@@ -1,7 +1,9 @@
 import os
-from usuarios import cargar_usuarios, guardar_usuarios, crear_usuario, tiene_permiso
+from usuarios import GestorUsuarios
 
 REPO_ROOT = "data/repositorio"
+
+gestor_usuarios = GestorUsuarios()
 
 def inicializar_repositorio():
     if not os.path.exists(REPO_ROOT):
@@ -9,14 +11,14 @@ def inicializar_repositorio():
         print("📁 Carpeta raíz del repositorio creada.")
 
 def crear_repositorio(usuario, ruta):
-    usuarios = cargar_usuarios()
+    usuarios = gestor_usuarios.cargar_usuarios()
 
     if usuario not in usuarios:
         print(f"⚠️ Usuario '{usuario}' no existe. Creándolo como administrador...")
-        crear_usuario(usuario)
-        usuarios = cargar_usuarios()
+        gestor_usuarios.crear_usuario(usuario)
+        usuarios = gestor_usuarios.cargar_usuarios()
         usuarios[usuario]["admin"] = True
-        guardar_usuarios(usuarios)
+        gestor_usuarios.guardar_usuarios(usuarios)
 
     ruta = os.path.abspath(ruta.strip().replace('"', ''))
 
@@ -36,17 +38,17 @@ def crear_repositorio(usuario, ruta):
         return False
 
     usuarios[usuario]["repositorio"] = repo_path
-    guardar_usuarios(usuarios)
+    gestor_usuarios.guardar_usuarios(usuarios)
     print(f"✅ Repositorio '{repo_path}' creado correctamente.")
     return True
 
 def listar_archivos(usuario_actual, propietario):
-    usuarios = cargar_usuarios()
+    usuarios = gestor_usuarios.cargar_usuarios()
     if propietario not in usuarios or not usuarios[propietario]["repositorio"]:
         print("❌ El usuario no tiene repositorio.")
         return
 
-    if not tiene_permiso(usuario_actual, propietario, "lectura"):
+    if not gestor_usuarios.tiene_permiso(usuario_actual, propietario, "lectura"):
         print("❌ No tienes permiso para ver este repositorio.")
         return
 

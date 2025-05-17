@@ -1,10 +1,10 @@
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 import os
-import time
-from usuarios import cargar_usuarios, crear_usuario_administrador, asignar_permiso
+from usuarios import GestorUsuarios
 from repositorio import crear_repositorio
 from version_control import commit, update
+import shutil
 
 class GitGUI(tk.Tk):
     def __init__(self):
@@ -13,7 +13,8 @@ class GitGUI(tk.Tk):
         self.geometry("1080x640")
         self.usuario_actual = tk.StringVar()
         self.repo_actual = tk.StringVar()
-        self.usuarios = cargar_usuarios()
+        self.gestor_usuarios = GestorUsuarios()
+        self.usuarios = self.gestor_usuarios.cargar_usuarios()
 
         self._build_layout()
 
@@ -59,8 +60,11 @@ class GitGUI(tk.Tk):
         if desde == hacia:
             return messagebox.showerror("Error", "No puedes asignarte permisos a ti mismo.")
 
-        asignar_permiso(desde, hacia, tipo)
+        self.gestor_usuarios.asignar_permiso(desde, hacia, tipo)
         messagebox.showinfo("Permiso asignado", f"{desde} dio permiso '{tipo}' a {hacia}.")
+
+        # Recargar repositorios tras asignar permiso, para actualizar la lista
+        self._recargar_repos(desde)
 
     def _build_sidebar(self):
         ttk.Label(self.sidebar, text="👤 Usuario activo").pack(pady=(10, 0))
@@ -80,7 +84,6 @@ class GitGUI(tk.Tk):
 
         ttk.Button(self.sidebar, text="➕ Crear nuevo repo", command=self._crear_nuevo_repositorio).pack(pady=(10, 5), padx=10, fill='x')
 
-        # --- NUEVO BLOQUE PARA CREAR USUARIOS ---
         ttk.Separator(self.sidebar).pack(pady=10, fill='x')
         ttk.Label(self.sidebar, text="➕ Crear nuevo usuario").pack()
         self.entry_nuevo_user = ttk.Entry(self.sidebar)
@@ -121,22 +124,27 @@ class GitGUI(tk.Tk):
 
     def _recargar_repos(self, usuario):
         self.list_repos.delete(0, tk.END)
-        self.usuarios = cargar_usuarios()
+        self.usuarios = self.gestor_usuarios.cargar_usuarios()
 
-        # Repositorio propio
-        repo_path = self.usuarios.get(usuario, {}).get("repositorio")
-        if repo_path:
-            self.list_repos.insert(tk.END, repo_path)
+        # Lista para evitar rutas duplicadas
+        rutas_agregadas = set()
 
-        # Repos donde OTROS le dieron permiso a este usuario
+        # Agregar repositorio propio del usuario activo
+        repo_propio = self.usuarios.get(usuario, {}).get("repositorio")
+        if repo_propio and repo_propio not in rutas_agregadas:
+            self.list_repos.insert(tk.END, repo_propio)
+            rutas_agregadas.add(repo_propio)
+
+        # Agregar repositorios asignados por otros usuarios (las copias individuales del visitante)
         for otro_user, data in self.usuarios.items():
             if otro_user == usuario:
                 continue
             permisos = data.get("permisos", {})
             if usuario in permisos:
-                repo_otro = data.get("repositorio")
-                if repo_otro:
-                    self.list_repos.insert(tk.END, repo_otro)
+                repo_visitante = self.usuarios.get(usuario, {}).get("repositorio")
+                if repo_visitante and repo_visitante not in rutas_agregadas:
+                    self.list_repos.insert(tk.END, repo_visitante)
+                    rutas_agregadas.add(repo_visitante)
 
     def _on_repo_selected(self, event=None):
         seleccion = self.list_repos.curselection()
@@ -157,19 +165,18 @@ class GitGUI(tk.Tk):
         self.repo_actual.set(path)
         self._mostrar_archivos()
         messagebox.showinfo("Éxito", "Repositorio creado correctamente")
-        
 
     def _crear_usuario_app(self):
         nuevo = self.entry_nuevo_user.get().strip()
         if not nuevo:
             return messagebox.showerror("Error", "Debes escribir un nombre.")
-        usuarios = cargar_usuarios()
+        usuarios = self.gestor_usuarios.cargar_usuarios()
         if nuevo in usuarios:
             return messagebox.showerror("Error", "Ese usuario ya existe.")
+
         
-        from usuarios import crear_usuario
-        crear_usuario(nuevo)
-        self.usuarios = cargar_usuarios()
+        self.gestor_usuarios.crear_usuario(nuevo)
+        self.usuarios = self.gestor_usuarios.cargar_usuarios()
         self.combo_usuario['values'] = list(self.usuarios.keys())
         self.perm_user['values'] = list(self.usuarios.keys())
         messagebox.showinfo("Éxito", f"Usuario '{nuevo}' creado.")
@@ -191,6 +198,8 @@ class GitGUI(tk.Tk):
         self.tree_perm.delete(*self.tree_perm.get_children())
 
         def agregar_elementos(tree, path, padre=""):
+            if not os.path.exists(path):
+                return
             for nombre in os.listdir(path):
                 ruta = os.path.join(path, nombre)
                 if os.path.isdir(ruta):
@@ -199,26 +208,35 @@ class GitGUI(tk.Tk):
                 else:
                     tree.insert(padre, "end", text=f"📄 {nombre}")
 
-        if os.path.exists(temp):
-            agregar_elementos(self.tree_temp, temp)
-
-        if os.path.exists(perm):
-            agregar_elementos(self.tree_perm, perm)
+        agregar_elementos(self.tree_temp, temp)
+        agregar_elementos(self.tree_perm, perm)
 
     def _commit(self):
         user = self.usuario_actual.get()
         if not user:
+            messagebox.showerror("Error", "No hay usuario activo seleccionado.")
             return
-        commit(user)
+
+        exito, mensaje = commit(user)
         self._mostrar_archivos()
-        messagebox.showinfo("Commit", "Commit completado y versión guardada.")
+
+        if exito:
+            messagebox.showinfo("Commit", mensaje)
+        else:
+            messagebox.showerror("Error", mensaje)
 
     def _update(self):
-        user = self.usuario_actual.get()
-        if not user:
+        user1 = self.usuario_actual.get()
+        if not user1:
             return
-        update(user, user)
+        success, message = update(user1)  # solo 1 argumento
         self._mostrar_archivos()
+        if success:
+            messagebox.showinfo("Update", message)
+        else:
+            messagebox.showerror("Error", message)
+
+
 
     def _ver_backups(self):
         repo = self.repo_actual.get()
@@ -252,8 +270,6 @@ class GitGUI(tk.Tk):
         ttk.Button(win, text="Cerrar", command=win.destroy).pack(pady=5)
 
     def _mostrar_archivos_backup(self, backup_path):
-        import shutil
-
         ventana = tk.Toplevel(self)
         ventana.title(f"Archivos en {os.path.basename(backup_path)}")
 
@@ -312,7 +328,8 @@ class GitGUI(tk.Tk):
         ttk.Button(ventana, text="Restaurar archivo seleccionado", command=restaurar_archivo).pack(fill='x', padx=10, pady=5)
         ttk.Button(ventana, text="Restaurar TODO el backup", command=restaurar_todo).pack(fill='x', padx=10, pady=5)
         ttk.Button(ventana, text="Cerrar", command=ventana.destroy).pack(pady=5)
-        
+
+
 if __name__ == "__main__":
     app = GitGUI()
     app.mainloop()
