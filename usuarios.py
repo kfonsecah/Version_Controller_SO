@@ -78,10 +78,10 @@ class GestorUsuarios:
             print("❌ El propietario no tiene un repositorio asignado.")
             return False
 
-        # Asignar permiso al visitante
+        # Asignar permiso al visitante en el repositorio del propietario
         usuarios[propietario].setdefault("permisos", {})[visitante] = permiso
 
-        # Si visitante no tiene repositorio, crear copia en la ruta hermana
+        # Crear repositorio del visitante si no tiene uno
         repo_visitante = usuarios[visitante].get("repositorio")
         if not repo_visitante:
             ruta_base = os.path.dirname(repo_propietario)
@@ -94,9 +94,27 @@ class GestorUsuarios:
 
             usuarios[visitante]["repositorio"] = ruta_visitante
 
+        # Obtener permisos definidos en el repositorio raíz
+        permisos_raiz = usuarios[propietario].get("permisos", {})
+
+        for usuario_destino in usuarios:
+            if usuario_destino == propietario:
+                continue  # No replicamos hacia el mismo repo raíz
+
+            # Asignar permisos de lectura únicamente en los otros repositorios
+            for destino_otorgado in permisos_raiz:
+                if destino_otorgado == usuario_destino:
+                    continue  # Evitar autoconcesión
+
+                usuarios[usuario_destino].setdefault("permisos", {})[destino_otorgado] = "lectura"
+
+            # Asegurar que el propietario (raíz) tenga lectura en los demás
+            usuarios[usuario_destino].setdefault("permisos", {})[propietario] = "lectura"
+
         self.guardar_usuarios(usuarios)
-        print(f"✅ '{propietario}' otorgó '{permiso}' a '{visitante}'.")
+        print(f"✅ '{propietario}' otorgó '{permiso}' a '{visitante}' y replicó permisos solo como lectura en otros repos.")
         return True
+
 
     def tiene_permiso(self, usuario_actual, propietario, tipo):
         usuarios = self.cargar_usuarios()

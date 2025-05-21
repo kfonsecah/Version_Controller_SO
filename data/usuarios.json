@@ -1,26 +1,26 @@
 {
     "Alejandro": {
-        "repositorio": "C:\\Users\\aletr\\OneDrive\\Documents\\test\\Alejandro",
+        "repositorio": "C:\\Users\\ALEJANDROLEONMARIN\\Documents\\test\\Alejandro",
         "admin": false,
         "permisos": {
-            "Kendall": "lectura",
             "Josue": "escritura",
-            "Marconi": "lectura"
+            "Kendall": "lectura"
+        }
+    },
+    "Josue": {
+        "repositorio": "C:\\Users\\ALEJANDROLEONMARIN\\Documents\\test\\Josue",
+        "admin": false,
+        "permisos": {
+            "Alejandro": "lectura",
+            "Kendall": "lectura"
         }
     },
     "Kendall": {
-        "repositorio": "C:\\Users\\aletr\\OneDrive\\Documents\\test\\Kendall",
+        "repositorio": "C:\\Users\\ALEJANDROLEONMARIN\\Documents\\test\\Kendall",
         "admin": false,
-        "permisos": {}
-    },
-    "Josue": {
-        "repositorio": "C:\\Users\\aletr\\OneDrive\\Documents\\test\\Josue",
-        "admin": false,
-        "permisos": {}
-    },
-    "Marconi": {
-        "repositorio": "C:\\Users\\aletr\\OneDrive\\Documents\\test\\Marconi",
-        "admin": false,
-        "permisos": {}
+        "permisos": {
+            "Josue": "lectura",
+            "Alejandro": "lectura"
+        }
     }
 }
