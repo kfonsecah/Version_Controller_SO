@@ -78,7 +78,7 @@ class GestorUsuarios:
             print("❌ El propietario no tiene un repositorio asignado.")
             return False
 
-        # Asignar permiso al visitante en el repositorio del propietario
+        # Asignar permiso al visitante en el repositorio del propietario (repo raíz)
         usuarios[propietario].setdefault("permisos", {})[visitante] = permiso
 
         # Crear repositorio del visitante si no tiene uno
@@ -94,27 +94,30 @@ class GestorUsuarios:
 
             usuarios[visitante]["repositorio"] = ruta_visitante
 
-        # Obtener permisos definidos en el repositorio raíz
-        permisos_raiz = usuarios[propietario].get("permisos", {})
+        # Obtener los permisos definidos en el repo raíz
+        permisos_raiz = usuarios[propietario].get("permisos", {}).copy()
+        permisos_raiz[propietario] = "escritura"  # el repo raíz se da permiso a sí mismo (solo para replicar en otros)
 
-        for usuario_destino in usuarios:
-            if usuario_destino == propietario:
-                continue  # No replicamos hacia el mismo repo raíz
+        for usuario_destino in permisos_raiz:
+            if usuario_destino not in usuarios:
+                continue
+            repo_destino = usuarios[usuario_destino].get("repositorio")
+            if not repo_destino:
+                continue
 
-            # Asignar permisos de lectura únicamente en los otros repositorios
-            for destino_otorgado in permisos_raiz:
-                if destino_otorgado == usuario_destino:
-                    continue  # Evitar autoconcesión
+            for otro_usuario, nivel in permisos_raiz.items():
+                if usuario_destino == otro_usuario:
+                    continue  # No se asigna a sí mismo
 
-                usuarios[usuario_destino].setdefault("permisos", {})[destino_otorgado] = "lectura"
-
-            # Asegurar que el propietario (raíz) tenga lectura en los demás
-            usuarios[usuario_destino].setdefault("permisos", {})[propietario] = "lectura"
+                # El propietario (repo raíz) siempre tiene escritura en los otros
+                if otro_usuario == propietario:
+                    usuarios[usuario_destino].setdefault("permisos", {})[propietario] = "escritura"
+                else:
+                    usuarios[usuario_destino].setdefault("permisos", {})[otro_usuario] = nivel
 
         self.guardar_usuarios(usuarios)
-        print(f"✅ '{propietario}' otorgó '{permiso}' a '{visitante}' y replicó permisos solo como lectura en otros repos.")
+        print(f"✅ '{propietario}' otorgó '{permiso}' a '{visitante}' y replicó todos los permisos dinámicamente.")
         return True
-
 
     def tiene_permiso(self, usuario_actual, propietario, tipo):
         usuarios = self.cargar_usuarios()

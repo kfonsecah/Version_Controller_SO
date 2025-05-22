@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import ttk, messagebox, filedialog
+from tkinter import ttk, messagebox, filedialog, simpledialog
 import os
 from usuarios import GestorUsuarios
 from repositorio import crear_repositorio
@@ -9,7 +9,7 @@ import shutil
 class GitGUI(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("Control de Versiones - GitHub Desktop Style")
+        self.title("Control de Versiones - Sistemas Operativos")
         self.geometry("1080x640")
         self.usuario_actual = tk.StringVar()
         self.repo_actual = tk.StringVar()
@@ -33,6 +33,150 @@ class GitGUI(tk.Tk):
         self.perm_tipo.pack(fill='x', pady=2)
 
         ttk.Button(frame, text="Asignar permiso", command=self._asignar_permiso_app).pack(fill='x', pady=5)
+        
+    def _obtener_propietario_raiz(self, ruta_repo_actual, usuario):
+    # Recorremos todos los usuarios
+        for posible_propietario, datos in self.usuarios.items():
+            ruta_repo_propietario = datos.get("repositorio")
+            if not ruta_repo_propietario:
+                continue
+
+            # El propietario original es quien tiene una ruta distinta pero ha otorgado permisos a este usuario
+            permisos = datos.get("permisos", {})
+            if ruta_repo_propietario != ruta_repo_actual and usuario in permisos:
+                return posible_propietario
+        return usuario  # Si no se encontró otro, asumimos que él es el propietario
+
+    def _crear_archivo_temporal(self):
+        temp_path, _ = self._get_paths()
+        if not temp_path:
+            return
+
+        usuario = self.usuario_actual.get()
+        ruta_repo = self.repo_actual.get()
+
+        # Verificar permisos de escritura
+        propietario = self._obtener_propietario_raiz(ruta_repo, usuario)
+        if not self.gestor_usuarios.tiene_permiso(usuario, propietario, "escritura"):
+            return messagebox.showerror("Permiso denegado", "No tienes permiso de escritura para este repositorio.")
+
+        nuevo_nombre = simpledialog.askstring("Nuevo archivo", "Nombre del archivo:")
+        if not nuevo_nombre:
+            return
+
+        ruta_base = temp_path
+        seleccion = self.tree_temp.selection()
+
+        if seleccion:
+            nodo = seleccion[0]
+            texto = self.tree_temp.item(nodo, "text")
+            if texto.startswith("📁"):
+                nombres = []
+                while nodo:
+                    nombres.insert(0, self.tree_temp.item(nodo, "text").replace("📁 ", "").replace("📄 ", ""))
+                    nodo = self.tree_temp.parent(nodo)
+                ruta_base = os.path.join(temp_path, *nombres)
+
+        ruta = os.path.join(ruta_base, nuevo_nombre)
+        if os.path.exists(ruta):
+            return messagebox.showerror("Error", "Ya existe un archivo con ese nombre.")
+        try:
+            with open(ruta, "w") as f:
+                f.write("")  # Archivo vacío
+            self._mostrar_archivos()
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo crear el archivo: {e}")
+
+
+
+    def _renombrar_archivo_temporal(self, event):
+        item = self.tree_temp.identify_row(event.y)
+        if not item:
+            return
+
+        usuario = self.usuario_actual.get()
+        ruta_repo = self.repo_actual.get()
+
+        # Verificar que el usuario tiene permisos de escritura
+        propietario = self._obtener_propietario_raiz(ruta_repo, usuario)
+        if not self.gestor_usuarios.tiene_permiso(usuario, propietario, "escritura"):
+            return messagebox.showerror("Permiso denegado", "No tienes permiso de escritura para este repositorio.")
+
+        antiguo = self.tree_temp.item(item, "text").replace("📄 ", "").replace("📁 ", "")
+        temp_path, _ = self._get_paths()
+        ruta_antigua = os.path.join(temp_path, antiguo)
+
+        nuevo = simpledialog.askstring("Renombrar archivo", "Nuevo nombre:", initialvalue=antiguo)
+        if not nuevo:
+            return
+
+        ruta_nueva = os.path.join(temp_path, nuevo)
+        try:
+            os.rename(ruta_antigua, ruta_nueva)
+            self._mostrar_archivos()
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo renombrar: {e}")
+    
+    def _crear_carpeta_temporal(self):
+        temp_path, _ = self._get_paths()
+        if not temp_path:
+            return
+
+        usuario = self.usuario_actual.get()
+        ruta_repo = self.repo_actual.get()
+        propietario = self._obtener_propietario_raiz(ruta_repo, usuario)
+        if not self.gestor_usuarios.tiene_permiso(usuario, propietario, "escritura"):
+            return messagebox.showerror("Permiso denegado", "No tienes permiso de escritura para este repositorio.")
+
+        nueva_carpeta = simpledialog.askstring("Crear carpeta", "Nombre de la nueva carpeta:")
+        if not nueva_carpeta:
+            return
+
+        ruta = os.path.join(temp_path, nueva_carpeta)
+        if os.path.exists(ruta):
+            return messagebox.showerror("Error", "Ya existe una carpeta con ese nombre.")
+
+        try:
+            os.makedirs(ruta)
+            self._mostrar_archivos()
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo crear la carpeta: {e}")
+            
+    def _eliminar_archivo_perm(self, event=None):
+        item = self.tree_perm.focus()
+        if not item:
+            return messagebox.showwarning("Sin selección", "Seleccione un archivo o carpeta para eliminar.")
+
+        nombre = self.tree_perm.item(item, "text").replace("📄 ", "").replace("📁 ", "")
+        _, perm_path = self._get_paths()
+        ruta = os.path.join(perm_path, nombre)
+
+        if not os.path.exists(ruta):
+            return messagebox.showerror("Error", "El archivo o carpeta no existe.")
+
+        # Verificación de permisos de escritura
+        usuario = self.usuario_actual.get()
+        ruta_repo = self.repo_actual.get()
+        propietario = self._obtener_propietario_raiz(ruta_repo, usuario)
+
+        if not self.gestor_usuarios.tiene_permiso(usuario, propietario, "escritura"):
+            return messagebox.showerror("Permiso denegado", "No tienes permiso de escritura para eliminar este archivo o carpeta.")
+
+        confirmar = messagebox.askyesno("Confirmar eliminación", f"¿Deseas eliminar '{nombre}' permanentemente?")
+        if not confirmar:
+            return
+
+        try:
+            if os.path.isdir(ruta):
+                shutil.rmtree(ruta)
+            else:
+                os.remove(ruta)
+            messagebox.showinfo("Eliminado", f"'{nombre}' se eliminó correctamente.")
+            self._mostrar_archivos()
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo eliminar: {e}")
+
+
 
     def _build_layout(self):
         self.grid_rowconfigure(0, weight=1)
@@ -67,6 +211,7 @@ class GitGUI(tk.Tk):
         self._recargar_repos(desde)
 
     def _build_sidebar(self):
+        
         ttk.Label(self.sidebar, text="👤 Usuario activo").pack(pady=(10, 0))
         self.combo_usuario = ttk.Combobox(self.sidebar, state="readonly")
         self.combo_usuario['values'] = list(self.usuarios.keys())
@@ -87,16 +232,13 @@ class GitGUI(tk.Tk):
         ttk.Separator(self.sidebar).pack(pady=10, fill='x')
         ttk.Label(self.sidebar, text="➕ Crear nuevo usuario").pack()
         self.entry_nuevo_user = ttk.Entry(self.sidebar)
+        self.entry_nuevo_user.bind("<Return>", lambda event: self._crear_usuario_app())
         self.entry_nuevo_user.pack(padx=10, fill='x')
         ttk.Button(self.sidebar, text="Crear usuario", command=self._crear_usuario_app).pack(padx=10, pady=5, fill='x')
 
     def _build_main_content(self):
         frame_btns = ttk.Frame(self.content)
         frame_btns.pack(fill='x', pady=10)
-
-        ttk.Button(frame_btns, text="🔃 Update", command=self._update).pack(side='left', padx=5)
-        ttk.Button(frame_btns, text="💾 Commit", command=self._commit).pack(side='left', padx=5)
-        ttk.Button(frame_btns, text="📦 Ver Backups", command=self._ver_backups).pack(side='left', padx=5)
 
         frame_archivos = ttk.Frame(self.content)
         frame_archivos.pack(fill='both', expand=True, padx=10, pady=10)
@@ -112,10 +254,19 @@ class GitGUI(tk.Tk):
 
         self.tree_temp.grid(row=1, column=0, sticky="nsew", padx=5)
         self.tree_perm.grid(row=1, column=1, sticky="nsew", padx=5)
+        self.tree_temp.bind("<Double-Button-1>", self._renombrar_archivo_temporal)
 
         frame_archivos.grid_rowconfigure(1, weight=1)
         frame_archivos.grid_columnconfigure(0, weight=1)
         frame_archivos.grid_columnconfigure(1, weight=1)
+
+        ttk.Button(frame_archivos, text="➕ Crear archivo en Temporal", command=self._crear_archivo_temporal).grid(row=2, column=0, pady=5)
+        ttk.Button(frame_archivos, text="📁 Crear carpeta en Temporal", command=self._crear_carpeta_temporal).grid(row=3, column=0, pady=5)
+        ttk.Button(frame_btns, text="🔃 Update", command=self._update).pack(side='left', padx=5)
+        ttk.Button(frame_btns, text="💾 Commit", command=self._commit).pack(side='left', padx=5)
+        ttk.Button(frame_btns, text="📦 Ver Backups", command=self._ver_backups).pack(side='left', padx=5)
+        ttk.Button(frame_btns, text="🗑️ Eliminar del Permanente", command=self._eliminar_archivo_perm).pack(side='left', padx=5)
+
 
     def _on_user_selected(self, event=None):
         usuario = self.combo_usuario.get()
@@ -165,6 +316,7 @@ class GitGUI(tk.Tk):
         self.repo_actual.set(path)
         self._mostrar_archivos()
         messagebox.showinfo("Éxito", "Repositorio creado correctamente")
+        
 
     def _crear_usuario_app(self):
         nuevo = self.entry_nuevo_user.get().strip()
@@ -174,12 +326,12 @@ class GitGUI(tk.Tk):
         if nuevo in usuarios:
             return messagebox.showerror("Error", "Ese usuario ya existe.")
 
-        
         self.gestor_usuarios.crear_usuario(nuevo)
         self.usuarios = self.gestor_usuarios.cargar_usuarios()
         self.combo_usuario['values'] = list(self.usuarios.keys())
         self.perm_user['values'] = list(self.usuarios.keys())
         messagebox.showinfo("Éxito", f"Usuario '{nuevo}' creado.")
+        self.entry_nuevo_user.delete(0, tk.END)
 
     def _get_paths(self):
         base = self.repo_actual.get()
@@ -235,8 +387,6 @@ class GitGUI(tk.Tk):
             messagebox.showinfo("Update", message)
         else:
             messagebox.showerror("Error", message)
-
-
 
     def _ver_backups(self):
         repo = self.repo_actual.get()
@@ -328,7 +478,6 @@ class GitGUI(tk.Tk):
         ttk.Button(ventana, text="Restaurar archivo seleccionado", command=restaurar_archivo).pack(fill='x', padx=10, pady=5)
         ttk.Button(ventana, text="Restaurar TODO el backup", command=restaurar_todo).pack(fill='x', padx=10, pady=5)
         ttk.Button(ventana, text="Cerrar", command=ventana.destroy).pack(pady=5)
-
 
 if __name__ == "__main__":
     app = GitGUI()

@@ -2,8 +2,21 @@ import os
 import shutil
 from datetime import datetime
 from usuarios import GestorUsuarios
+import hashlib
 
 gestor_usuarios = GestorUsuarios()
+
+def hash_archivo(ruta):
+    """Devuelve el hash SHA-256 de un archivo para comparar contenido."""
+    h = hashlib.sha256()
+    try:
+        with open(ruta, "rb") as f:
+            while chunk := f.read(8192):
+                h.update(chunk)
+        return h.hexdigest()
+    except Exception as e:
+        print(f"[ERROR] No se pudo leer {ruta}: {e}")
+        return None
 
 def copiar_con_sobrescritura(src, dst):
     """Copia un archivo o carpeta de src a dst, sobrescribiendo dst si existe."""
@@ -17,34 +30,49 @@ def copiar_con_sobrescritura(src, dst):
     else:
         shutil.copy2(src, dst)
 
-def necesita_update(usuario):
-    """Determina si el usuario debe hacer update antes de commit."""
+def necesita_update(usuario_actual):
+    """Determina si el usuario debe hacer update antes de hacer commit, revisando permanente y temporal."""
     usuarios = gestor_usuarios.cargar_usuarios()
-    repo_usuario = usuarios.get(usuario, {}).get("repositorio")
+    repo_usuario = usuarios.get(usuario_actual, {}).get("repositorio")
     if not repo_usuario:
         return False
 
-    propietario = None
-    for user, data in usuarios.items():
-        if data.get("repositorio") == repo_usuario:
-            propietario = user
-            break
+    # 🔍 Construir conjunto de hashes del usuario desde permanente y temporal
+    hash_usuario = {}
+    for carpeta in ["permanente", "temporal"]:
+        ruta = os.path.join(repo_usuario, carpeta)
+        if os.path.exists(ruta):
+            for archivo in os.listdir(ruta):
+                abs_path = os.path.join(ruta, archivo)
+                if os.path.isfile(abs_path):
+                    hash_usuario[archivo] = hash_archivo(abs_path)
 
-    if propietario is None:
-        return False
+    for propietario, datos in usuarios.items():
+        if propietario == usuario_actual:
+            continue
 
-    repo_propietario = usuarios[propietario]["repositorio"]
-    versiones_propietario = os.path.join(repo_propietario, "versions")
-    versiones_usuario = os.path.join(repo_usuario, "versions")
+        repo_otro = datos.get("repositorio")
+        if not repo_otro:
+            continue
 
-    ultimo_backup_prop = obtener_ultimo_backup(versiones_propietario)
-    ultimo_backup_usr = obtener_ultimo_backup(versiones_usuario)
+        permiso = datos.get("permisos", {}).get(usuario_actual)
+        if permiso not in ("lectura", "escritura"):
+            continue
 
-    if ultimo_backup_prop is None:
-        return False
-    if ultimo_backup_usr is None:
-        return True
-    return ultimo_backup_usr < ultimo_backup_prop
+        perm_path_otro = os.path.join(repo_otro, "permanente")
+        if not os.path.exists(perm_path_otro):
+            continue
+
+        for archivo in os.listdir(perm_path_otro):
+            ruta_otro = os.path.join(perm_path_otro, archivo)
+            if not os.path.isfile(ruta_otro):
+                continue
+            hash_otro = hash_archivo(ruta_otro)
+            hash_usr = hash_usuario.get(archivo)
+            if hash_usr is None or hash_usr != hash_otro:
+                return True  # Hay un archivo nuevo o con contenido diferente
+
+    return False
 
 def commit(usuario):
     usuarios = gestor_usuarios.cargar_usuarios()
@@ -52,18 +80,21 @@ def commit(usuario):
     if not repo_usuario:
         return False, "❌ El usuario no tiene un repositorio asignado."
 
+    # Buscar a qué usuario pertenece realmente ese repositorio
     propietario = None
     for user, data in usuarios.items():
         if data.get("repositorio") == repo_usuario:
             propietario = user
             break
 
-    if propietario is None:
+    if not propietario:
         return False, "❌ No se encontró el propietario del repositorio."
 
+    # Verificar permiso de escritura
     if not gestor_usuarios.tiene_permiso(usuario, propietario, "escritura"):
         return False, "❌ No tienes permiso de escritura para hacer commit en este repositorio."
 
+    # Verificar si necesita update
     if necesita_update(usuario):
         return False, "⚠️ Debes hacer update antes de poder hacer commit."
 
@@ -93,10 +124,11 @@ def commit(usuario):
         shutil.rmtree(temp_path)
         os.makedirs(temp_path)
 
-        return True, f"✅ Commit realizado. Backup guardado en: {backup_dir}"
+        return True, "✅ Commit realizado correctamente."
 
     except Exception as e:
         return False, f"❌ Error durante commit: {e}"
+
 
 # Función auxiliar para obtener todos los repositorios accesibles para un usuario
 def obtener_repositorios_accesibles(usuario):
@@ -149,63 +181,52 @@ def update(usuario_actual):
     usuario_raiz = list(usuarios.keys())[0]
     mejor_candidato = None
 
+    archivos_usuario = set()
+    perm_path_usuario = os.path.join(repo_usuario_actual, "permanente")
+    if os.path.exists(perm_path_usuario):
+        archivos_usuario = set(os.listdir(perm_path_usuario))
+
     for propietario, datos in usuarios.items():
         repo_propietario = datos.get("repositorio")
-        if not repo_propietario:
+        if not repo_propietario or repo_propietario == repo_usuario_actual:
             continue
 
-        # Determinar permiso de usuario_actual sobre este repo
         permiso = "escritura" if propietario == usuario_actual else usuarios[propietario].get("permisos", {}).get(usuario_actual)
-
-
         if permiso not in ("lectura", "escritura"):
-            continue  # No tiene acceso, ignorar
-
-        versions_path = os.path.join(repo_propietario, "versions")
-        if not os.path.exists(versions_path):
             continue
 
-        backups = [
-            d for d in os.listdir(versions_path)
-            if d.startswith("backup_") and os.path.isdir(os.path.join(versions_path, d))
-        ]
+        perm_path_otro = os.path.join(repo_propietario, "permanente")
+        if not os.path.exists(perm_path_otro):
+            continue
 
-        for backup in backups:
-            try:
-                fecha = datetime.strptime(backup.replace("backup_", ""), "%Y%m%d%H%M%S")
-            except:
-                continue
+        archivos_otro = set(os.listdir(perm_path_otro))
+        nuevos_archivos = archivos_otro - archivos_usuario
 
-            if (not mejor_candidato) or (fecha > mejor_candidato["fecha"]):
-                mejor_candidato = {
-                    "propietario": propietario,
-                    "repo": repo_propietario,
-                    "permiso": permiso,
-                    "backup": backup,
-                    "fecha": fecha
-                }
+        if nuevos_archivos:
+            mejor_candidato = {
+                "propietario": propietario,
+                "repo": repo_propietario,
+                "permiso": permiso,
+                "nuevos": nuevos_archivos
+            }
+            break  # Si encontramos uno que tenga archivos que no tengo, actualizamos de inmediato
 
     if not mejor_candidato:
-        return False, "❌ No se encontró ningún backup accesible."
+        return False, "✅ Ya tienes la versión más actualizada (basado en carpetas permanentes)."
 
-    print(f"[DEBUG] Backup más reciente: {mejor_candidato['backup']} de '{mejor_candidato['propietario']}'")
-
-    perm_path = os.path.join(mejor_candidato["repo"], "permanente")
+    # Copiar solo archivos nuevos desde perm_path del otro repo
+    perm_path_fuente = os.path.join(mejor_candidato["repo"], "permanente")
     destino = os.path.join(
         repo_usuario_actual,
         "permanente" if mejor_candidato["permiso"] == "lectura" else "temporal"
     )
 
+    os.makedirs(destino, exist_ok=True)  # No borramos, solo creamos si no existe
 
-
-    if os.path.exists(destino):
-        shutil.rmtree(destino)
-    os.makedirs(destino)
-
-    for archivo in os.listdir(perm_path):
-        src = os.path.join(perm_path, archivo)
+    for archivo in mejor_candidato["nuevos"]:
+        src = os.path.join(perm_path_fuente, archivo)
         dst = os.path.join(destino, archivo)
         copiar_con_sobrescritura(src, dst)
 
-    return True, f"✅ Update realizado desde '{mejor_candidato['propietario']}' hacia '{usuario_actual}' en '{mejor_candidato['permiso']}' ({mejor_candidato['backup']})"
+    return True, f"✅ Update completado. Tu repositorio ha quedado en la versión más reciente."
 
