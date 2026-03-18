@@ -18,112 +18,86 @@ HELP_TEXT = """
 ══════════════════════════════════════════════════════
  📌 COMANDOS DISPONIBLES:
  ------------------------------------------------------
- 🔹 crear_repositorio --usuario <nombre> --ruta <ruta>
-     ➝ Crea un repositorio en una ubicación específica.
-
- 🔹 crear_usuario --admin <nombre> --usuario <nuevo>
-     ➝ Crea un usuario (solo administradores pueden hacerlo).
-
- 🔹 listar --usuario <nombre>
-     ➝ Lista los archivos en el repositorio del usuario.
-
- 🔹 commit --usuario <nombre>
-     ➝ Guarda cambios de la carpeta temporal a la permanente.
-
- 🔹 update --usuario <nombre>
-     ➝ Restaura archivos de la permanente a la temporal.
-
- 🔹 asignar_permiso --usuario <nombre> --permiso <usuario:lectura/escritura>
-     ➝ Asigna permisos a otro usuario.
-
- 🔹 salir
-     ➝ Cierra el sistema.
+ 🔹 repo --user <nombre> --path <ruta>
+ 🔹 user --admin <nombre> --new <nuevo>
+ 🔹 ls --user <actual> --owner <otro>
+ 🔹 commit --user <nombre>
+ 🔹 update --user <actual> --owner <otro>
+ 🔹 perm --user <nombre> --set <otro:read/write>
+ 🔹 help
+ 🔹 exit
 ══════════════════════════════════════════════════════
 """
 
 def mostrar_banner():
-    """Limpia pantalla y muestra el banner."""
     os.system("cls" if os.name == "nt" else "clear")
     print(BANNER)
     print("🔹 SISTEMA DE CONTROL DE VERSIONES - Consola Interactiva 🔹")
     print("Escribe 'help' para ver los comandos disponibles.\n")
 
 def mostrar_help():
-    """Muestra la lista de comandos disponibles."""
     print(HELP_TEXT)
 
 def procesar_comando(entrada):
-    """Convierte la entrada en un diccionario de argumentos correctamente."""
     partes = entrada.strip().split()
-
     if not partes:
         return None, {}
 
     accion = partes[0].lower()
     args = {}
-
-    try:
-        i = 1
-        while i < len(partes):
-            if partes[i].startswith("--") and i + 1 < len(partes):
-                clave = partes[i][2:]  # Quita '--' del argumento
-                valor = partes[i + 1]
-                args[clave] = valor
-                i += 2
-            else:
-                i += 1
-    except IndexError:
-        print("❌ Error en el formato del comando. Usa 'help' para ver los comandos disponibles.")
-        return None, {}
-
+    i = 1
+    while i < len(partes):
+        if partes[i].startswith("--") and i + 1 < len(partes):
+            clave = partes[i][2:]
+            valor = partes[i + 1]
+            args[clave] = valor
+            i += 2
+        else:
+            i += 1
     return accion, args
 
 def main():
     mostrar_banner()
 
     while True:
-        entrada = input("\n> ").strip()
-
+        entrada = input("> ").strip()
         if not entrada:
             continue
 
         accion, args = procesar_comando(entrada)
 
-        if not accion:
-            continue
-
-        if accion in ["salir", "exit"]:
-            print("\nSaliendo del sistema... 👋")
+        if accion in ["exit", "salir"]:
+            print("👋 Cerrando...")
             time.sleep(1)
             sys.exit()
 
-        elif accion in ["help", "--help"]:
+        elif accion == "help":
             mostrar_help()
 
-        elif accion == "crear_repositorio" and "usuario" in args and "ruta" in args:
-            crear_repositorio(args["usuario"], args["ruta"])
+        elif accion == "repo" and "user" in args and "path" in args:
+            crear_repositorio(args["user"], args["path"])
 
-        elif accion == "crear_usuario" and "admin" in args and "usuario" in args:
-            crear_usuario_administrador(args["admin"], args["usuario"])
+        elif accion == "user" and "admin" in args and "new" in args:
+            crear_usuario_administrador(args["admin"], args["new"])
 
-        elif accion == "listar" and "usuario" in args:
-            listar_archivos(args["usuario"])
+        elif accion == "ls" and "user" in args and "owner" in args:
+            listar_archivos(args["user"], args["owner"])
 
-        elif accion == "commit" and "usuario" in args:
-            commit(args["usuario"])
+        elif accion == "commit" and "user" in args:
+            commit(args["user"])
 
-        elif accion == "update" and "usuario" in args:
-            update(args["usuario"])
+        elif accion == "update" and "user" in args and "owner" in args:
+            update(args["user"], args["owner"])
 
-        elif accion == "asignar_permiso" and "usuario" in args and "permiso" in args:
+        elif accion == "perm" and "user" in args and "set" in args:
             try:
-                objetivo, permiso = args["permiso"].split(":")
-                asignar_permiso(args["usuario"], objetivo, permiso)
+                objetivo, nivel = args["set"].split(":")
+                asignar_permiso(args["user"], objetivo, nivel)
             except ValueError:
-                print("❌ Error en el formato del permiso. Usa: --permiso usuario:lectura o usuario:escritura")
+                print("❌ Usa el formato: --set otro:read o otro:write")
 
-    else:
-        print("❌ Comando no reconocido. Escribe 'help' para ver la lista de comandos.")
+        else:
+            print("❌ Comando no reconocido. Escribe 'help'.")
 
 if __name__ == "__main__":
     main()

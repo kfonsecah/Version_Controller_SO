@@ -1,71 +1,72 @@
 import os
-import json
-from usuarios import cargar_usuarios, guardar_usuarios, crear_usuario
+from usuarios import GestorUsuarios
 
 REPO_ROOT = "data/repositorio"
 
+gestor_usuarios = GestorUsuarios()
+
 def inicializar_repositorio():
-    """Crea la carpeta raíz del repositorio si no existe."""
     if not os.path.exists(REPO_ROOT):
         os.makedirs(REPO_ROOT)
-        print("📁 Carpeta del repositorio creada correctamente.")
+        print("📁 Carpeta raíz del repositorio creada.")
 
 def crear_repositorio(usuario, ruta):
-    """Crea un repositorio y asigna el usuario como administrador si no existe."""
-    usuarios = cargar_usuarios()
+    usuarios = gestor_usuarios.cargar_usuarios()
 
-    # Si el usuario no existe, lo crea automáticamente como administrador
     if usuario not in usuarios:
-        print(f"⚠️ El usuario '{usuario}' no existe. Creándolo como administrador...")
-        crear_usuario(usuario)
-        usuarios = cargar_usuarios()
+        print(f"⚠️ Usuario '{usuario}' no existe. Creándolo como administrador...")
+        gestor_usuarios.crear_usuario(usuario)
+        usuarios = gestor_usuarios.cargar_usuarios()
         usuarios[usuario]["admin"] = True
-        guardar_usuarios(usuarios)
+        gestor_usuarios.guardar_usuarios(usuarios)
 
-    # Crear la estructura de carpetas en la ruta elegida
-    if not os.path.exists(ruta):
-        os.makedirs(ruta)
+    ruta = os.path.abspath(ruta.strip().replace('"', ''))
 
-    repo_path = os.path.join(ruta, usuario)
+    if not ruta.endswith(usuario):
+        repo_path = os.path.join(ruta, usuario)
+    else:
+        repo_path = ruta
+
     temp_path = os.path.join(repo_path, "temporal")
     perm_path = os.path.join(repo_path, "permanente")
 
-    os.makedirs(temp_path, exist_ok=True)
-    os.makedirs(perm_path, exist_ok=True)
+    try:
+        os.makedirs(temp_path, exist_ok=True)
+        os.makedirs(perm_path, exist_ok=True)
+    except OSError as e:
+        print(f"❌ Error creando estructura del repositorio: {e}")
+        return False
 
     usuarios[usuario]["repositorio"] = repo_path
-    guardar_usuarios(usuarios)
-
-    print(f"✅ Repositorio '{repo_path}' creado con éxito. '{usuario}' ahora es ADMINISTRADOR.")
+    gestor_usuarios.guardar_usuarios(usuarios)
+    print(f"✅ Repositorio '{repo_path}' creado correctamente.")
     return True
 
-
-def listar_archivos(usuario):
-    """Lista los archivos en el repositorio del usuario y permite explorar subcarpetas."""
-    usuarios = cargar_usuarios()
-    
-    if usuario not in usuarios or not usuarios[usuario]["repositorio"]:
-        print(f"❌ El usuario '{usuario}' no tiene un repositorio asignado.")
+def listar_archivos(usuario_actual, propietario):
+    usuarios = gestor_usuarios.cargar_usuarios()
+    if propietario not in usuarios or not usuarios[propietario]["repositorio"]:
+        print("❌ El usuario no tiene repositorio.")
         return
-    
-    repo_path = usuarios[usuario]["repositorio"]
-    temp_path = os.path.join(repo_path, "temporal")
+
+    if not gestor_usuarios.tiene_permiso(usuario_actual, propietario, "lectura"):
+        print("❌ No tienes permiso para ver este repositorio.")
+        return
+
+    repo_path = usuarios[propietario]["repositorio"]
+    temp_path = os.path.join(repo_path, f"temporal_{usuario_actual}" if usuario_actual != propietario else "temporal")
     perm_path = os.path.join(repo_path, "permanente")
 
-    archivos_repo = os.listdir(repo_path)
-    print(f"\n📂 Repositorio de {usuario}: {repo_path}")
-    print("📂 Carpetas disponibles:", archivos_repo)
+    print(f"\n📂 Repositorio de {propietario}: {repo_path}")
+    print("📂 Carpetas: temporal / permanente")
 
-    # Verificar si la carpeta temporal tiene archivos sin subir
-    archivos_temporales = os.listdir(temp_path)
+    archivos_temporales = os.listdir(temp_path) if os.path.exists(temp_path) else []
     archivos_permanentes = os.listdir(perm_path)
 
     if archivos_temporales and not archivos_permanentes:
         print("⚠️ Hay archivos en 'temporal' que aún no han sido subidos con 'commit'.")
 
-    # Preguntar al usuario qué carpeta quiere explorar
     while True:
-        opcion = input("\n🔹 ¿Quieres ver archivos en 'temporal' o 'permanente'? (t/p, salir para omitir): ").strip().lower()
+        opcion = input("¿Ver 't'emporal, 'p'ermanente o 'salir'? ").lower()
         if opcion == "t":
             mostrar_archivos(temp_path)
         elif opcion == "p":
@@ -73,14 +74,16 @@ def listar_archivos(usuario):
         elif opcion == "salir":
             break
         else:
-            print("❌ Opción no válida. Escribe 't' para 'temporal', 'p' para 'permanente' o 'salir' para salir.")
+            print("Comando inválido.")
 
 def mostrar_archivos(ruta):
-    """Muestra los archivos dentro de una carpeta específica."""
+    if not os.path.exists(ruta):
+        print(f"📂 La carpeta '{ruta}' no existe.")
+        return
     archivos = os.listdir(ruta)
     if archivos:
         print(f"\n📄 Archivos en {ruta}:")
         for archivo in archivos:
-            print(f"   - {archivo}")
+            print(f" - {archivo}")
     else:
-        print(f"\n📂 La carpeta '{ruta}' está vacía.")
+        print(f"📂 La carpeta '{ruta}' está vacía.")

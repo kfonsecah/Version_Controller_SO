@@ -1,17 +1,26 @@
 {
-    "kendall": {
+    "Alejandro": {
+        "repositorio": "C:\\Users\\aletr\\Documents\\test\\Alejandro",
+        "admin": false,
         "permisos": {
-            "alejandro": "lectura"
-        },
-        "repositorio": "C:\\Users\\Administrador\\Desktop\\U\\Sistemas\\kendall",
-        "admin": true
+            "Kendall": "lectura",
+            "Josue": "escritura"
+        }
     },
-    "matiw": {
-        "permisos": {},
-        "repositorio": null
+    "Kendall": {
+        "repositorio": "C:\\Users\\aletr\\Documents\\test\\Kendall",
+        "admin": false,
+        "permisos": {
+            "Alejandro": "escritura",
+            "Josue": "escritura"
+        }
     },
-    "alejandro": {
-        "permisos": {},
-        "repositorio": null
+    "Josue": {
+        "repositorio": "C:\\Users\\aletr\\Documents\\test\\Josue",
+        "admin": false,
+        "permisos": {
+            "Kendall": "lectura",
+            "Alejandro": "escritura"
+        }
     }
 }
